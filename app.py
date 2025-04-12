@@ -23,7 +23,7 @@ conversation_history = {}
 
 # Initialize OpenAI (if API key available)
 try:
-    openai.api_key = os.getenv("OPENAI_KEY", "")
+    openai.api_key = os.getenv("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", "")
     OPENAI_AVAILABLE = True
 except:
     OPENAI_AVAILABLE = False
