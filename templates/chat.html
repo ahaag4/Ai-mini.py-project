@@ -1,150 +1,106 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
+    <title>AI Assistant</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional AI Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #10a37f;
-            --bg: #f7f7f8;
-            --card: #ffffff;
-            --text: #374151;
-            --border: #e5e7eb;
-        }
         body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
         }
         #chat-container {
-            flex: 1;
+            height: 70vh;
             overflow-y: auto;
-            padding: 20px;
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: white;
         }
         .message {
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
             max-width: 80%;
-            margin-bottom: 16px;
-            padding: 12px 16px;
-            border-radius: 12px;
-            line-height: 1.5;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            line-height: 1.4;
         }
         .user-message {
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: #007bff;
+            color: white;
             margin-left: auto;
         }
         .ai-message {
-            background: var(--primary);
-            color: white;
+            background: #e9ecef;
             margin-right: auto;
         }
-        #input-container {
-            padding: 16px;
-            background: white;
-            border-top: 1px solid var(--border);
-            position: sticky;
-            bottom: 0;
-        }
-        #input-wrapper {
-            max-width: 800px;
-            margin: 0 auto;
+        #input-area {
             display: flex;
-            gap: 8px;
+            gap: 10px;
         }
         #user-input {
             flex: 1;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
+            padding: 10px 15px;
+            border: 1px solid #ced4da;
+            border-radius: 20px;
             font-size: 16px;
         }
-        #send-button {
-            background: var(--primary);
+        #send-btn {
+            background: #007bff;
             color: white;
             border: none;
-            border-radius: 8px;
-            padding: 0 24px;
-            font-weight: 500;
+            border-radius: 20px;
+            padding: 0 20px;
             cursor: pointer;
         }
-        .typing-indicator {
-            display: none;
-            padding: 12px 16px;
-            background: var(--primary);
-            color: white;
-            border-radius: 12px;
-            margin-right: auto;
-            max-width: 80%;
+        .error-message {
+            color: #dc3545;
+            text-align: center;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
+    <h2 style="color: #007bff;">AI Assistant</h2>
     <div id="chat-container"></div>
-    
-    <div id="input-container">
-        <div id="input-wrapper">
-            <input 
-                type="text" 
-                id="user-input" 
-                placeholder="Type your message..." 
-                autocomplete="off"
-            >
-            <button id="send-button">Send</button>
-        </div>
+    <div id="error-message" class="error-message" style="display: none;"></div>
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button id="send-btn">Send</button>
     </div>
 
     <script>
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
-        
-        // Add message to chat
-        function addMessage(role, content) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}-message`;
-            messageDiv.textContent = content;
-            chatContainer.appendChild(messageDiv);
+        const sendBtn = document.getElementById('send-btn');
+        const errorMsg = document.getElementById('error-message');
+
+        function showError(message) {
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+            setTimeout(() => errorMsg.style.display = 'none', 5000);
+        }
+
+        function addMessage(sender, text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}-message`;
+            msgDiv.textContent = text;
+            chatContainer.appendChild(msgDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Show typing indicator
-        function showTyping() {
-            const indicator = document.createElement('div');
-            indicator.className = 'typing-indicator';
-            indicator.id = 'typing-indicator';
-            indicator.textContent = 'AI is typing...';
-            chatContainer.appendChild(indicator);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // Hide typing indicator
-        function hideTyping() {
-            const indicator = document.getElementById('typing-indicator');
-            if (indicator) indicator.remove();
-        }
-
-        // Send message to backend
         async function sendMessage() {
             const message = userInput.value.trim();
             if (!message) return;
             
             addMessage('user', message);
             userInput.value = '';
-            showTyping();
+            sendBtn.disabled = true;
             
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch('http://localhost:5000/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -152,27 +108,28 @@
                     body: JSON.stringify({ message })
                 });
                 
-                hideTyping();
-                
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    const errorData = await response.json();
+                    throw new Error(errorData.response || 'Network error');
                 }
                 
                 const data = await response.json();
                 if (data.status === 'success') {
                     addMessage('ai', data.response);
                 } else {
-                    addMessage('ai', "Sorry, I couldn't process your request. " + data.response);
+                    showError(data.response);
                 }
             } catch (error) {
-                hideTyping();
-                addMessage('ai', "Connection error. Please try again later.");
+                showError(`Connection failed: ${error.message}`);
                 console.error('Error:', error);
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
             }
         }
 
         // Event listeners
-        sendButton.addEventListener('click', sendMessage);
+        sendBtn.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
