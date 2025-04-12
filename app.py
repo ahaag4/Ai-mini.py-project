@@ -18,7 +18,7 @@ API_PROVIDERS = [
     {
         "name": "HuggingFace-Mixtral",
         "url": "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "headers": {"Authorization": "Bearer hf_YourFreeTokenHere"},  # Optional
+        "headers": {"Authorization": "Bearer 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"},  # Optional
         "payload": lambda text: {"inputs": text},
         "parse": lambda r: r.json()[0]['generated_text']
     }
