@@ -1,59 +1,91 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Chatbot</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: Arial; padding: 20px; max-width: 600px; margin: auto; }
-    #chat-container { border: 1px solid #ccc; padding: 10px; height: 70vh; overflow-y: auto; border-radius: 5px; }
-    .user-message, .bot-message { margin: 10px 0; padding: 10px; border-radius: 5px; }
-    .user-message { background: #d1ecf1; text-align: right; }
-    .bot-message { background: #f8f9fa; text-align: left; }
-    input, button { padding: 10px; border-radius: 5px; }
-    input { width: 70%; border: 1px solid #ccc; }
-    button { background: #007bff; color: white; border: none; }
-  </style>
+    <title>AI Tutor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial; margin: 0; padding: 20px; max-width: 800px; margin: auto; }
+        #chat-container { height: 70vh; overflow-y: auto; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+        .message { margin-bottom: 10px; padding: 10px; border-radius: 8px; max-width: 70%; }
+        .user-message { background: #e3f2fd; margin-left: auto; }
+        .bot-message { background: #f1f1f1; margin-right: auto; }
+        .message-meta { font-size: 0.8em; color: #666; margin-top: 5px; }
+        #input-area { display: flex; gap: 10px; }
+        #user-input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
+        button { padding: 10px 20px; background: #4285f4; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .model-indicator { float: right; font-size: 0.8em; color: #666; }
+    </style>
 </head>
 <body>
-  <h2>Free AI Chatbot (No API Key)</h2>
-  <div id="chat-container"></div>
-  <input id="user-input" placeholder="Type a message..." />
-  <button onclick="sendMessage()">Send</button>
+    <h2>Advanced AI Tutor <span class="model-indicator" id="model-indicator">Model: Loading...</span></h2>
+    <div id="chat-container"></div>
+    <div id="input-area">
+        <input type="text" id="user-input" placeholder="Ask about algorithms, math..." autocomplete="off">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    <button onclick="logout()" style="background: #f44336; margin-top: 10px;">Logout</button>
 
-  <script>
-    async function sendMessage() {
-      const input = document.getElementById("user-input");
-      const chat = document.getElementById("chat-container");
-      const msg = input.value.trim();
-      if (!msg) return;
+    <script>
+        const chatContainer = document.getElementById("chat-container");
+        const userInput = document.getElementById("user-input");
+        
+        // Load previous conversation
+        window.onload = () => {
+            addMessage("bot", "Welcome to Advanced AI Tutor! How can I help you with your studies today?", new Date());
+        };
 
-      const userDiv = document.createElement("div");
-      userDiv.className = "user-message";
-      userDiv.innerText = "You: " + msg;
-      chat.appendChild(userDiv);
-      input.value = "";
+        function addMessage(sender, text, timestamp) {
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${sender}-message`;
+            
+            const textDiv = document.createElement("div");
+            textDiv.textContent = text;
+            
+            const metaDiv = document.createElement("div");
+            metaDiv.className = "message-meta";
+            metaDiv.textContent = timestamp.toLocaleTimeString();
+            
+            messageDiv.appendChild(textDiv);
+            messageDiv.appendChild(metaDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
 
-      const botDiv = document.createElement("div");
-      botDiv.className = "bot-message";
-      botDiv.innerText = "AI: Thinking...";
-      chat.appendChild(botDiv);
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            const timestamp = new Date();
+            addMessage("user", message, timestamp);
+            userInput.value = "";
+            
+            try {
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message })
+                });
+                
+                const data = await response.json();
+                if (data.error) {
+                    addMessage("bot", `Error: ${data.error}`, new Date());
+                } else {
+                    addMessage("bot", data.response, new Date(data.timestamp));
+                    document.getElementById("model-indicator").textContent = `Model: ${data.model}`;
+                }
+            } catch (error) {
+                addMessage("bot", "Failed to get response from server", new Date());
+            }
+        }
 
-      chat.scrollTop = chat.scrollHeight;
+        async function logout() {
+            await fetch("/logout", { method: "POST" });
+            window.location.href = "/";
+        }
 
-      const res = await fetch("/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: "user_input=" + encodeURIComponent(msg)
-      });
-
-      const data = await res.json();
-      botDiv.innerText = "AI: " + data.response;
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    document.getElementById("user-input").addEventListener("keypress", function (e) {
-      if (e.key === "Enter") sendMessage();
-    });
-  </script>
+        userInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+    </script>
 </body>
 </html>
