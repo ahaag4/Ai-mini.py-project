@@ -1,40 +1,166 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
+import openai
+import os
 import requests
+import json
+import time
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.urandom(24)
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 
-# Fast Hugging Face model
-API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
+# Database simulation (replace with real DB in production)
+users_db = {
+    "admin": generate_password_hash("admin123"),
+    "student": generate_password_hash("student123")
+}
 
-@app.route('/')
-def home():
-    return render_template("chat.html")  # Your HTML must be named 'chat.html' and in 'templates/' folder
+conversation_history = {}
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_input = request.form['user_input']
+# Initialize OpenAI (if API key available)
+try:
+    openai.api_key = os.getenv("OPENAI_KEY", "")
+    OPENAI_AVAILABLE = True
+except:
+    OPENAI_AVAILABLE = False
 
-    payload = {
-        "inputs": f"User: {user_input}\nAI:",
-    }
+class AdvancedChatbot:
+    def __init__(self):
+        self.models = {
+            "free": "https://api.deepinfra.com/v1/inference/meta-llama/Llama-2-70b-chat-hf",
+            "paid": "gpt-3.5-turbo" if OPENAI_AVAILABLE else None
+        }
+        self.knowledge_graph = self._build_knowledge_graph()
+        
+    def _build_knowledge_graph(self):
+        """Semantic knowledge base for fallback"""
+        return {
+            "computer_science": {
+                "algorithms": {
+                    "definition": "Step-by-step procedures for calculations",
+                    "examples": ["Sorting", "Searching", "Graph traversal"],
+                    "complexity": {
+                        "bubble_sort": "O(n²)",
+                        "quick_sort": "O(n log n) average"
+                    }
+                },
+                "databases": {
+                    "types": ["Relational", "NoSQL", "Graph"],
+                    "sql": "Structured Query Language"
+                }
+            },
+            "math": {
+                "calculus": {
+                    "derivatives": "Rate of change",
+                    "integrals": "Accumulation of quantities"
+                }
+            }
+        }
 
-    try:
-        response = requests.post(API_URL, json=payload, timeout=20)
-        data = response.json()
+    def _query_knowledge_graph(self, topic):
+        """Semantic search through local knowledge"""
+        topic = topic.lower()
+        for domain in self.knowledge_graph:
+            if topic in domain.lower():
+                return json.dumps(self.knowledge_graph[domain], indent=2)
+            for subtopic in self.knowledge_graph[domain]:
+                if topic in subtopic.lower():
+                    return json.dumps(self.knowledge_graph[domain][subtopic], indent=2)
+        return None
 
-        # Debug output
-        print("Model response:", data)
+    def generate_response(self, user_input, user_id):
+        """Advanced response generation with multiple fallbacks"""
+        # Track conversation context
+        if user_id not in conversation_history:
+            conversation_history[user_id] = []
+        
+        # Try OpenAI first if available
+        if OPENAI_AVAILABLE:
+            try:
+                response = openai.ChatCompletion.create(
+                    model=self.models["paid"],
+                    messages=[
+                        {"role": "system", "content": "You are an advanced AI tutor for computer science students."},
+                        *conversation_history[user_id],
+                        {"role": "user", "content": user_input}
+                    ],
+                    temperature=0.7,
+                    max_tokens=150
+                )
+                reply = response.choices[0].message.content
+                conversation_history[user_id].append({"role": "assistant", "content": reply})
+                return reply
+            except Exception as e:
+                print(f"OpenAI error: {e}")
 
-        if isinstance(data, list) and 'generated_text' in data[0]:
-            reply = data[0]['generated_text'].replace("User:", "").replace("AI:", "").strip()
-        elif 'error' in data:
-            reply = f"Model error: {data['error']}"
-        else:
-            reply = "Sorry, I didn't get a valid response."
+        # Fallback to free API
+        try:
+            payload = {
+                "input": user_input,
+                "context": str(conversation_history.get(user_id, []))
+            }
+            response = requests.post(
+                self.models["free"],
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=10
+            )
+            if response.status_code == 200:
+                reply = response.json()['results'][0]['generated_text']
+                conversation_history[user_id].append({"role": "assistant", "content": reply})
+                return reply
+        except Exception as e:
+            print(f"Free API error: {e}")
 
-        return jsonify({"response": reply})
-    except Exception as e:
-        return jsonify({"response": f"Server error: {str(e)}"})
+        # Final fallback to knowledge graph
+        knowledge = self._query_knowledge_graph(user_input)
+        if knowledge:
+            return f"From knowledge base:\n{knowledge}"
+        
+        return "I couldn't generate a response. Please try rephrasing your question."
 
-if __name__ == '__main__':
-    app.run(debug=True)
+@app.route("/")
+def index():
+    if "user_id" not in session:
+        return render_template("login.html")
+    return render_template("chat.html")
+
+@app.route("/login", methods=["POST"])
+def login():
+    username = request.form.get("username")
+    password = request.form.get("password")
+    
+    if username in users_db and check_password_hash(users_db[username], password):
+        session["user_id"] = username
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+
+@app.route("/logout")
+def logout():
+    session.pop("user_id", None)
+    return jsonify({"status": "success"})
+
+@app.route("/api/chat", methods=["POST"])
+def chat_api():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_input = request.json.get("message")
+    if not user_input:
+        return jsonify({"error": "Empty message"}), 400
+    
+    bot = AdvancedChatbot()
+    response = bot.generate_response(user_input, session["user_id"])
+    
+    return jsonify({
+        "response": response,
+        "timestamp": datetime.now().strftime("%H:%M:%S"),
+        "model": "Llama2-70B" if not OPENAI_AVAILABLE else "GPT-3.5"
+    })
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
