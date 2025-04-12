@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>AI Assistant</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
     <style>
         body {
             font-family: 'Segoe UI', sans-serif;
@@ -98,7 +99,7 @@
             addMessage('user', message);
             userInput.value = '';
             sendBtn.disabled = true;
-            
+
             try {
                 const response = await fetch('http://localhost:5000/api/chat', {
                     method: 'POST',
@@ -107,12 +108,12 @@
                     },
                     body: JSON.stringify({ message })
                 });
-                
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.response || 'Network error');
                 }
-                
+
                 const data = await response.json();
                 if (data.status === 'success') {
                     addMessage('ai', data.response);
