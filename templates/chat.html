@@ -3,17 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Assistant</title>
+    <title>Professional AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #10a37f;
-            --bg: #343541;
-            --text: #ececf1;
-            --card: #444654;
+            --bg: #f7f7f8;
+            --card: #ffffff;
+            --text: #374151;
+            --border: #e5e7eb;
         }
         body {
+            font-family: 'Inter', sans-serif;
             margin: 0;
-            font-family: 'Segoe UI', system-ui;
+            padding: 0;
             background: var(--bg);
             color: var(--text);
             display: flex;
@@ -24,91 +27,111 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
         }
         .message {
-            max-width: 800px;
-            margin: 0 auto;
-            width: 100%;
-            padding: 15px 20px;
-            border-radius: 8px;
+            max-width: 80%;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         .user-message {
-            background: var(--bg);
-            border: 1px solid #555;
+            background: var(--card);
+            border: 1px solid var(--border);
+            margin-left: auto;
         }
         .ai-message {
-            background: var(--card);
+            background: var(--primary);
+            color: white;
+            margin-right: auto;
         }
-        #input-area {
-            padding: 15px;
-            background: var(--bg);
-            border-top: 1px solid #555;
+        #input-container {
+            padding: 16px;
+            background: white;
+            border-top: 1px solid var(--border);
+            position: sticky;
+            bottom: 0;
         }
-        #input-box {
-            width: 100%;
+        #input-wrapper {
             max-width: 800px;
             margin: 0 auto;
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
         #user-input {
             flex: 1;
-            padding: 12px 15px;
-            border-radius: 6px;
-            border: 1px solid #555;
-            background: #40414f;
-            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
             font-size: 16px;
         }
-        #send-btn {
+        #send-button {
             background: var(--primary);
             color: white;
             border: none;
-            border-radius: 6px;
-            padding: 0 20px;
+            border-radius: 8px;
+            padding: 0 24px;
+            font-weight: 500;
             cursor: pointer;
         }
-        .model-tag {
-            font-size: 0.8em;
-            color: #aaa;
-            margin-top: 5px;
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: var(--primary);
+            color: white;
+            border-radius: 12px;
+            margin-right: auto;
+            max-width: 80%;
         }
     </style>
 </head>
 <body>
     <div id="chat-container"></div>
     
-    <div id="input-area">
-        <div id="input-box">
+    <div id="input-container">
+        <div id="input-wrapper">
             <input 
                 type="text" 
                 id="user-input" 
-                placeholder="Ask me anything..." 
+                placeholder="Type your message..." 
                 autocomplete="off"
-                autofocus
             >
-            <button id="send-btn">Send</button>
+            <button id="send-button">Send</button>
         </div>
     </div>
 
     <script>
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
+        const sendButton = document.getElementById('send-button');
         
         // Add message to chat
-        function addMessage(role, content, model = null) {
+        function addMessage(role, content) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}-message`;
-            messageDiv.innerHTML = `
-                <div>${content.replace(/\n/g, '<br>')}</div>
-                ${model ? `<div class="model-tag">${model} • ${new Date().toLocaleTimeString()}</div>` : ''}
-            `;
+            messageDiv.textContent = content;
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Show typing indicator
+        function showTyping() {
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator';
+            indicator.id = 'typing-indicator';
+            indicator.textContent = 'AI is typing...';
+            chatContainer.appendChild(indicator);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTyping() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
         }
 
         // Send message to backend
@@ -118,7 +141,7 @@
             
             addMessage('user', message);
             userInput.value = '';
-            sendBtn.disabled = true;
+            showTyping();
             
             try {
                 const response = await fetch('/api/chat', {
@@ -129,28 +152,33 @@
                     body: JSON.stringify({ message })
                 });
                 
-                if (!response.ok) throw new Error('Network error');
+                hideTyping();
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
                 
                 const data = await response.json();
-                addMessage('ai', data.response, data.model);
-                
+                if (data.status === 'success') {
+                    addMessage('ai', data.response);
+                } else {
+                    addMessage('ai', "Sorry, I couldn't process your request. " + data.response);
+                }
             } catch (error) {
-                addMessage('ai', "Sorry, I'm having trouble responding. Please try again later.");
+                hideTyping();
+                addMessage('ai', "Connection error. Please try again later.");
                 console.error('Error:', error);
-            } finally {
-                sendBtn.disabled = false;
-                userInput.focus();
             }
         }
 
         // Event listeners
-        sendBtn.addEventListener('click', sendMessage);
+        sendButton.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
 
         // Initial greeting
-        addMessage('ai', "Hello! I'm your AI assistant. Ask me anything about science, technology, history, or general knowledge.", "System");
+        addMessage('ai', "Hello! I'm your AI assistant. How can I help you today?");
     </script>
 </body>
 </html>
