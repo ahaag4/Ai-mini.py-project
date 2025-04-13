@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .chat-box {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        #chat-output {
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .user-message, .bot-message {
+            margin: 10px 0;
+        }
+        .user-message {
+            color: #007BFF;
+        }
+        .bot-message {
+            color: #28A745;
+        }
+        .input-group {
+            display: flex;
+            justify-content: space-between;
+        }
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            width: 15%;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>AI Chatbot</h2>
+        <div class="chat-box">
+            <div id="chat-output"></div>
+            <div class="input-group">
+                <input type="text" id="user-input" placeholder="Ask a question..." autocomplete="off">
+                <button id="send-btn">Ask</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sendButton = document.getElementById('send-btn');
+        const userInput = document.getElementById('user-input');
+        const chatOutput = document.getElementById('chat-output');
+
+        sendButton.addEventListener('click', sendMessage);
+
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const userQuery = userInput.value.trim();
+            if (!userQuery) return;
+
+            // Display user message
+            chatOutput.innerHTML += `<div class="user-message">You: ${userQuery}</div>`;
+
+            // Clear input field
+            userInput.value = '';
+
+            // Make a POST request to ask the AI
+            fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `query=${encodeURIComponent(userQuery)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Display AI response
+                chatOutput.innerHTML += `<div class="bot-message">AI: ${data.response}</div>`;
+                chatOutput.scrollTop = chatOutput.scrollHeight; // Scroll to bottom
+            })
+            .catch(error => {
+                chatOutput.innerHTML += `<div class="bot-message">AI: Sorry, an error occurred. Please try again later.</div>`;
+            });
+        }
+    </script>
+</body>
+</html>
