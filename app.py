@@ -1,37 +1,32 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import wikipedia
 
 app = Flask(__name__)
 
-@app.route('/')
+# Store chat history
+history = []
+
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template('index.html')
+    response = ""
+    if request.method == "POST":
+        user_input = request.form.get("question", "").strip()
+        if user_input:
+            try:
+                response = wikipedia.summary(user_input, sentences=2)
+                history.append({"question": user_input, "answer": response})
+            except wikipedia.exceptions.DisambiguationError as e:
+                response = "That’s a bit ambiguous. Try one of: " + ", ".join(e.options[:5])
+            except wikipedia.exceptions.PageError:
+                response = "I couldn’t find a page on that. Please try something else."
+            except Exception as e:
+                response = f"Something went wrong: {str(e)}"
+    return render_template("index.html", response=response, history=history)
 
-@app.route('/ask', methods=['POST'])
-def ask():
-    query = request.form['query']
-    
-    try:
-        # Try to fetch a summary from Wikipedia
-        summary = wikipedia.summary(query, sentences=2)
-        return jsonify({'response': summary})
-    
-    except wikipedia.exceptions.DisambiguationError as e:
-        # If it's ambiguous, return the options
-        response = "That’s a bit ambiguous. Here are some options you can choose from:\n" + "\n".join(e.options)
-        return jsonify({'response': response})
-    
-    except wikipedia.exceptions.PageError:
-        # If no page is found for the query
-        return jsonify({'response': "I couldn’t find a page on that. Please try asking something else."})
-    
-    except wikipedia.exceptions.RedirectError:
-        # If there's a redirect error
-        return jsonify({'response': "That page is redirected. Trying to find the related page."})
-    
-    except Exception as e:
-        # Catching any other unexpected errors
-        return jsonify({'response': f"Something went wrong: {str(e)}"})
+@app.route("/clear")
+def clear_history():
+    history.clear()
+    return render_template("index.html", response="Conversation history cleared.", history=[])
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
